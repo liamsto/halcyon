@@ -1,3 +1,5 @@
+use core::{error::Error, fmt::Display};
+
 const SBI_ERR_FAILED: isize = -1;
 const SBI_ERR_NOT_SUPPORTED: isize = -2;
 const SBI_ERR_INVALID_PARAM: isize = -3;
@@ -19,6 +21,31 @@ pub enum SbiError {
     AlreadyStarted = SBI_ERR_ALREADY_STARTED,
     AlreadyStopped = SBI_ERR_ALREADY_STOPPED,
 }
+
+impl Display for SbiError {
+    fn fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
+        match self {
+            SbiError::Failed => write!(f, "operation failed due to I/O errors"),
+            SbiError::NotSupported => write!(f, "operation unsupported"),
+            SbiError::InvalidParam => write!(f, "operation failed due to an parameter"),
+            SbiError::Denied => write!(f, "the requested operation is forbidden"),
+            SbiError::InvalidAddress => {
+                write!(f, "operation failed due to an invalid memory address")
+            }
+            SbiError::AlreadyAvailable => write!(f, "the provided hartid is already started"),
+            SbiError::AlreadyStarted => write!(
+                f,
+                "some of the counters specified in parameters are already started"
+            ),
+            SbiError::AlreadyStopped => write!(
+                f,
+                "some of the counters specified in parameters are already stopped"
+            ),
+        }
+    }
+}
+
+impl Error for SbiError {}
 
 impl From<isize> for SbiError {
     fn from(value: isize) -> Self {

@@ -1,6 +1,6 @@
 use core::arch::asm;
 
-pub mod console;
+pub mod dbg_console;
 pub mod error;
 pub mod reset;
 pub mod timer;

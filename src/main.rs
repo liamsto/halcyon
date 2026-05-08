@@ -10,11 +10,8 @@ use core::{
     ptr::addr_of_mut,
 };
 
-use crate::sbi::{
-    console::write,
-    error::SbiError,
-    reset::{ResetReason, ResetType, system_reset},
-};
+use crate::io::puts;
+use crate::sbi::reset::{ResetReason, ResetType, system_reset};
 
 unsafe extern "C" {
     static mut __bss_start: u8;
@@ -27,24 +24,8 @@ global_asm!(include_str!("asm/boot.s"));
 pub extern "C" fn entry() -> ! {
     clear_bss();
 
-    match write("Hello from RISC-V and the SBI!\n") {
-        Ok(_) => {}
-        Err(e) => match e {
-            SbiError::Denied => puts("Access to debug console denied."),
-            SbiError::Failed => puts("An I/O error occured while accessing the debug console."),
-            SbiError::InvalidParam => puts("A bad parameter was passed to sbi_call."),
-            _ => puts("?"),
-        },
-    }
-
-    let result = system_reset(ResetType::SHUTDOWN, Some(ResetReason::SYSTEM_FAILURE));
-
-    match result {
-        Ok(()) => {}
-        Err(e) => {
-            write("bruh");
-        }
-    }
+    println!("Hello from RISC-V and the SBI!");
+    let _ = system_reset(ResetType::SHUTDOWN, Some(ResetReason::SYSTEM_FAILURE));
 
     loop {
         unsafe {
@@ -62,20 +43,6 @@ fn clear_bss() {
             bss.write_volatile(0);
             bss = bss.add(1);
         }
-    }
-}
-
-fn putchar(ch: u8) {
-    const UART0: *mut u8 = 0x1000_0000 as *mut u8;
-
-    unsafe {
-        UART0.write_volatile(ch);
-    }
-}
-
-fn puts(s: &str) {
-    for b in s.bytes() {
-        putchar(b);
     }
 }
 
