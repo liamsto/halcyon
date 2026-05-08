@@ -25,6 +25,14 @@ pub fn write(msg: &str) -> Result<usize, SbiError> {
     }
 }
 
+/// # Function: Console Read (FID #1)
+/// Read bytes from the debug console into an output memory.
+///
+/// See the [SBI Documentation](https://github.com/riscv-non-isa/riscv-sbi-doc/blob/master/src/ext-debug-console.adoc#function-console-read-fid-1) for more information.
+/// ## Errors
+/// - Returns `SbiError::InvalidParam` if the `num_bytes`, `base_addr_lo`, and `base_addr_hi` parameters from the call to `sbi_call` are invalid.
+/// - Returns `SbiError::Denied` if writing to the debug console is not allowed.
+/// - Returns `SbiError::Failed` if the write fails because of I/O errors.
 pub fn read(buf: &mut [u8]) -> Result<usize, SbiError> {
     if buf.is_empty() {
         return Ok(0);
@@ -46,6 +54,13 @@ pub fn read(buf: &mut [u8]) -> Result<usize, SbiError> {
     }
 }
 
+/// # Function: Console Write Byte (FID #2)
+/// Write a single byte to the debug console.
+///
+/// See the [SBI Documentation](https://github.com/riscv-non-isa/riscv-sbi-doc/blob/master/src/ext-debug-console.adoc#function-console-write-byte-fid-2) for more information.
+/// ## Errors
+/// - Returns `SbiError::Denied` if writing to the debug console is not allowed.
+/// - Returns `SbiError::Failed` if the write fails because of I/O errors.
 pub fn write_byte(byte: u8) -> Result<usize, SbiError> {
     let ret = sbi_call(EXT_DBCN, FID_CONSOLE_WRITE_BYTE, byte as usize, 0, 0);
     if ret.error < 0 {
