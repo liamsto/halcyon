@@ -4,14 +4,8 @@
 mod io;
 mod sbi;
 
-use core::{
-    arch::{asm, global_asm},
-    panic::PanicInfo,
-    ptr::addr_of_mut,
-};
-
-use crate::io::puts;
 use crate::sbi::reset::{ResetReason, ResetType, system_reset};
+use core::{arch::global_asm, panic::PanicInfo, ptr::addr_of_mut};
 
 unsafe extern "C" {
     static mut __bss_start: u8;
@@ -42,12 +36,15 @@ fn clear_bss() {
 }
 
 #[panic_handler]
-fn panic(_info: &PanicInfo) -> ! {
-    puts("kernel panic\n");
-
-    loop {
-        unsafe {
-            asm!("wfi");
-        }
+fn panic(info: &PanicInfo) -> ! {
+    if let Some(loc) = info.location() {
+        println!(
+            "panic in file {}, line {}: {}",
+            loc.file(),
+            loc.line(),
+            info.message()
+        )
     }
+    let _ = system_reset(ResetType::SHUTDOWN, Some(ResetReason::SYSTEM_FAILURE));
+    unreachable!() // this pattern is annoying
 }
