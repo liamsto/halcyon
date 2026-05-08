@@ -25,7 +25,7 @@ pub extern "C" fn entry() -> ! {
     clear_bss();
 
     println!("Hello from RISC-V and the SBI!");
-    let _ = system_reset(ResetType::SHUTDOWN, Some(ResetReason::SYSTEM_FAILURE));
+    let _ = system_reset(ResetType::SHUTDOWN, Some(ResetReason::NO_REASON));
     unreachable!()
 }
 

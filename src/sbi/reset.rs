@@ -84,31 +84,19 @@ pub fn system_reset(
     reset_type: ResetType,
     reset_reason: Option<ResetReason>,
 ) -> Result<(), SbiError> {
-    if let Some(rr) = reset_reason {
-        let ret = sbi_call(
-            EXTN_SRST,
-            FID_SYSTEM_RESET,
-            reset_type.value(),
-            rr.value(),
-            0,
-        );
-        if ret.error < 0 {
-            Err(SbiError::from(ret.error))
-        } else {
-            Ok(())
-        }
+    let reason = reset_reason.unwrap_or(ResetReason::NO_REASON);
+
+    let ret = sbi_call(
+        EXTN_SRST,
+        FID_SYSTEM_RESET,
+        reset_type.value(),
+        reason.value(),
+        0,
+    );
+
+    if ret.error < 0 {
+        Err(SbiError::from(ret.error))
     } else {
-        let ret = sbi_call(
-            EXTN_SRST,
-            FID_SYSTEM_RESET,
-            reset_type.value(),
-            ResetReason::NO_REASON.value(),
-            0,
-        );
-        if ret.error < 0 {
-            Err(SbiError::from(ret.error))
-        } else {
-            Ok(())
-        }
+        Ok(())
     }
 }
