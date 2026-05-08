@@ -80,6 +80,10 @@ impl ResetReason {
     }
 }
 
+// Until https://github.com/rust-lang/rust/pull/155499 is (hopefully) merged,
+// this will still return Result<(), SbiError>, even though technically a
+// successful system reset should never return, i.e it should be updated to
+// Result<!, SbiError> when ! is stable.
 pub fn system_reset(
     reset_type: ResetType,
     reset_reason: Option<ResetReason>,
