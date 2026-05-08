@@ -10,7 +10,11 @@ use core::{
     ptr::addr_of_mut,
 };
 
-use crate::sbi::{console::write, error::SbiError};
+use crate::sbi::{
+    console::write,
+    error::SbiError,
+    reset::{ResetReason, ResetType, system_reset},
+};
 
 unsafe extern "C" {
     static mut __bss_start: u8;
@@ -31,6 +35,15 @@ pub extern "C" fn entry() -> ! {
             SbiError::InvalidParam => puts("A bad parameter was passed to sbi_call."),
             _ => puts("?"),
         },
+    }
+
+    let result = system_reset(ResetType::SHUTDOWN, Some(ResetReason::SYSTEM_FAILURE));
+
+    match result {
+        Ok(()) => {}
+        Err(e) => {
+            write("bruh");
+        }
     }
 
     loop {

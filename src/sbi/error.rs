@@ -6,7 +6,6 @@ const SBI_ERR_INVALID_ADDRESS: isize = -5;
 const SBI_ERR_ALREADY_AVAILABLE: isize = -6;
 const SBI_ERR_ALREADY_STARTED: isize = -7;
 const SBI_ERR_ALREADY_STOPPED: isize = -8;
-const SBI_UNKNOWN_ERR: isize = isize::MAX;
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 #[repr(isize)]

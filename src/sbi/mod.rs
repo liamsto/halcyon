@@ -2,6 +2,7 @@ use core::arch::asm;
 
 pub mod console;
 pub mod error;
+pub mod reset;
 
 #[derive(Debug, Clone, Copy)]
 pub struct SbiRet {
