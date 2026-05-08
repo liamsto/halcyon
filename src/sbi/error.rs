@@ -19,7 +19,6 @@ pub enum SbiError {
     AlreadyAvailable = SBI_ERR_ALREADY_AVAILABLE,
     AlreadyStarted = SBI_ERR_ALREADY_STARTED,
     AlreadyStopped = SBI_ERR_ALREADY_STOPPED,
-    Unknown = SBI_UNKNOWN_ERR, // This doesn't exist in the ISA spec and should never occur, but it's useful for `_ =>` pattern matching
 }
 
 impl From<isize> for SbiError {
@@ -33,7 +32,7 @@ impl From<isize> for SbiError {
             SBI_ERR_ALREADY_AVAILABLE => SbiError::AlreadyAvailable,
             SBI_ERR_ALREADY_STARTED => SbiError::AlreadyStarted,
             SBI_ERR_ALREADY_STOPPED => SbiError::AlreadyStopped,
-            _ => SbiError::Unknown,
+            _ => unreachable!(),
         }
     }
 }
