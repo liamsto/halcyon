@@ -1,0 +1,20 @@
+[package]
+name = "halcyon"
+version = "0.1.0"
+edition = "2024"
+
+[dependencies]
+
+[profile.dev]
+panic = "abort"
+
+[profile.release]
+panic = "abort"
+
+# Fixes "can't find crate for `test`" error appearing in main.rs
+[[bin]]
+name = "halcyon"
+path = "src/main.rs"
+test = false
+doctest = false
+bench = false
