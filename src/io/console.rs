@@ -18,7 +18,7 @@ impl Write for Console {
     fn write_char(&mut self, c: char) -> core::fmt::Result {
         match dbg_console::write_byte(c as u8) {
             Ok(_) => Ok(()),
-            Err(e) => {
+            Err(_) => {
                 puts("an error occured");
                 Ok(())
             }

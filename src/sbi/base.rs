@@ -1,6 +1,5 @@
-use core::fmt::Display;
-
 use crate::sbi::sbi_call;
+use core::fmt::Display;
 
 const EXTN_BASE: usize = 0x10;
 const FID_GET_SBI_SPEC_VER: usize = 0;

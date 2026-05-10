@@ -1,7 +1,10 @@
 #![no_main]
 #![no_std]
 
+extern crate alloc;
+
 mod io;
+mod mem;
 mod sbi;
 
 use crate::sbi::{
@@ -20,8 +23,8 @@ global_asm!(include_str!("asm/boot.s"));
 #[unsafe(no_mangle)]
 pub extern "C" fn entry() -> ! {
     clear_bss();
-    let color = 34;
-    println!("\u{1B}[{}m[Boot Complete]\u{1B}[0m", color);
+    let color = 32;
+    println!("\u{1B}[{}m[Halcyon - Boot Complete]\u{1B}[0m", color);
     let spec_ver = get_spec_version();
     println!(
         "Specification Version: {}.{}\nVendor ID: {}\nSBI Implementation ID: {}\nSBI Implementation Version: {}\nMachine Architecture ID: {}\nMachine Implementation ID: {}\n",
