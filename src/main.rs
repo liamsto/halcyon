@@ -3,9 +3,12 @@
 
 extern crate alloc;
 
+mod arch;
+mod cpu;
 mod io;
 mod mem;
 mod sbi;
+mod sync;
 
 use crate::sbi::{
     base::{get_impl_id, get_impl_ver, get_march_id, get_mimpid, get_spec_version, get_vendor_id},
