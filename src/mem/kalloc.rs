@@ -48,9 +48,11 @@ unsafe impl GlobalAlloc for KernelAllocator {
 
         let mut heap = self.heap.lock();
 
-        match heap.alloc(layout) {
-            Some(ptr) => ptr.as_ptr(),
-            None => ptr::null_mut(),
+        unsafe {
+            match heap.alloc(layout) {
+                Some(ptr) => ptr.as_ptr(),
+                None => ptr::null_mut(),
+            }
         }
     }
 
@@ -60,6 +62,6 @@ unsafe impl GlobalAlloc for KernelAllocator {
         }
 
         let mut heap = self.heap.lock();
-        heap.dealloc(NonNull::new_unchecked(ptr), layout);
+        unsafe { heap.dealloc(NonNull::new_unchecked(ptr), layout) };
     }
 }

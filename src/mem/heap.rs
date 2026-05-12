@@ -13,7 +13,7 @@ pub struct KernelHeap {
     large: LargeAlloc,
 }
 
-const SIZE_CLASS_COUNT: usize = 18;
+const SIZE_CLASS_COUNT: usize = SIZE_CLASSES.len();
 
 impl KernelHeap {
     pub const fn empty() -> Self {
