@@ -14,6 +14,8 @@ pub struct KernelAllocator {
     heap: Spinlock<KernelHeap>,
 }
 
+unsafe impl Sync for KernelAllocator {}
+
 impl KernelAllocator {
     pub const fn new() -> Self {
         Self {
