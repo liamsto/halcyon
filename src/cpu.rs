@@ -2,7 +2,7 @@ use crate::arch::interrupt::{disable_interrupts, enable_interrupts, interrupts_e
 use core::{
     arch::asm,
     cell::UnsafeCell,
-    sync::atomic::{AtomicUsize, Ordering},
+    sync::atomic::{AtomicUsize, Ordering, fence},
 };
 
 pub const MAX_CPUS: usize = 32;
@@ -15,12 +15,21 @@ pub struct CpuSlot {
     local: CpuLocal,
 }
 
-// binds slot pointer into `tp`
-pub unsafe fn init_cpu(hart_id: usize) {
-    let slot = slot_for_hart(hart_id);
-    // ensure slot ownership is fully published before writing `tp`?
+/// Initializes a given hart's CPU-local pointer.
+///
+/// ## Safety
+/// - `hart_id` must be a unique identifier for the current hardware hart.
+/// - Must be called before `current_cpu()` can be used.
+/// - Must not be called twice for the same hart.
+pub unsafe fn init_current_cpu(hart_id: usize) {
+    let local = slot_for_hart(hart_id);
+    // We know that `slot_for_hart()` has either:
+    // - observed existing owner with Acquire
+    // - reset the slot and published for Release
+    // The fencing here is conservative, and forces the publication before any other tp-related traffic.
+    fence(Ordering::SeqCst);
     unsafe {
-        write_tp(slot as *const _ as usize);
+        write_tp(local as *const CpuLocal as usize);
     }
 }
 
@@ -90,26 +99,28 @@ pub fn init_cpu(ptr: *const CpuLocal) {
 }
 
 /// Read the current thread pointer (`tp`).
+#[inline(always)]
 pub unsafe fn read_tp() -> usize {
-    let tp: usize;
+    let value: usize;
     unsafe {
         asm!(
             "mv {out}, tp",
-            out = out(reg) tp,
-            options(nomem, nostack)
+            out = out(reg) value,
+            options(nomem, nostack, preserves_flags),
         );
     }
 
-    tp
+    value
 }
 
 /// Sets the current thread pointer (`tp`) to a given value.
+#[inline(always)]
 pub unsafe fn write_tp(value: usize) {
     unsafe {
         asm!(
             "mv tp, {val}",
             val = in(reg) value,
-            options(nomem, nostack)
+            options(nostack, preserves_flags)
         )
     }
 }
