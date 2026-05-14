@@ -1,10 +1,14 @@
 use crate::arch::interrupt::{disable_interrupts, enable_interrupts, interrupts_enabled};
-use core::{arch::asm, cell::UnsafeCell, sync::atomic::AtomicUsize};
+use core::{
+    arch::asm,
+    cell::UnsafeCell,
+    sync::atomic::{AtomicUsize, Ordering},
+};
 
 pub const MAX_CPUS: usize = 32;
 pub const HART_NONE: usize = usize::MAX;
 pub const HART_INIT: usize = usize::MAX - 1;
-pub static CPUS: [CpuSlot; MAX_CPUS] = [CpuSlot::new(); MAX_CPUS];
+pub static CPUS: [CpuSlot; MAX_CPUS] = [const { CpuSlot::new() }; MAX_CPUS];
 
 pub struct CpuSlot {
     owner: AtomicUsize,
@@ -19,7 +23,42 @@ impl CpuSlot {
         }
     }
 
-    fn slot_for_hart(hart_id: usize) -> &'static CpuLocal {}
+    fn slot_for_hart(hart_id: usize) -> &'static CpuLocal {
+        // Sentinel values can never be hart IDs
+        debug_assert_ne!(hart_id, HART_NONE);
+        debug_assert_ne!(hart_id, HART_INIT);
+
+        // maybe this hart already owns a slot
+        for cpu in CPUS.iter() {
+            if cpu.owner.load(Ordering::Acquire) == hart_id {
+                return &cpu.local;
+            }
+        }
+
+        // If not, claim an unowned slot
+        for cpu in CPUS.iter() {
+            match cpu.owner.compare_exchange(
+                HART_NONE,         // expected old value
+                HART_INIT,         // new temp value
+                Ordering::AcqRel,  // ordering if the exchange succeeds
+                Ordering::Acquire, // ordering if it fails
+            ) {
+                Ok(_) => {
+                    // This is now the only hart that can initialize this slot
+                    cpu.local.reset();
+                    cpu.owner.store(hart_id, Ordering::Release);
+                    return &cpu.local;
+                }
+
+                Err(_) => {
+                    // Someone else claimed it
+                    continue;
+                }
+            }
+        }
+
+        panic!("no CPU slot available for hart_id={hart_id}; MAX_CPUS={MAX_CPUS}");
+    }
 }
 
 pub struct CpuLocal {
@@ -79,6 +118,19 @@ pub unsafe fn current_cpu() -> &'static CpuLocal {
     }
 }
 
+/// A RAII struct that automatically calls `pop_off()` when it goes out of scope.
+pub struct InterruptGuard {
+    local: &'static CpuLocal,
+}
+
+impl Drop for InterruptGuard {
+    fn drop(&mut self) {
+        unsafe {
+            self.local.pop_off();
+        }
+    }
+}
+
 impl CpuLocal {
     pub const fn new() -> Self {
         Self {
@@ -87,21 +139,42 @@ impl CpuLocal {
         }
     }
 
-    pub unsafe fn push_off(&self) {
-        let enabled = interrupts_enabled();
+    fn reset(&self) {
+        // Safe because caller has claimed the slot by setting owner from HART_NONE -> HART_INIT
         unsafe {
-            let depth = self.interrupt_disable_depth.get();
+            *self.interrupt_disable_depth.get() = 0;
+            *self.interrupts_were_enabled.get() = false;
+        }
+    }
+
+    pub unsafe fn push_off_guard(&'static self) -> InterruptGuard {
+        unsafe {
+            self.push_off();
+        }
+
+        InterruptGuard { local: self }
+    }
+
+    unsafe fn push_off(&self) {
+        let enabled = interrupts_enabled();
+
+        unsafe {
             disable_interrupts();
+
+            let depth = self.interrupt_disable_depth.get();
             let old = *depth;
+
             if old == 0 {
                 *self.interrupts_were_enabled.get() = enabled;
             }
 
-            *depth + old + 1;
+            *depth = old
+                .checked_add(1)
+                .expect("interrupt_disable_depth overflow");
         }
     }
 
-    pub unsafe fn pop_off(&self) {
+    unsafe fn pop_off(&self) {
         unsafe {
             let depth = self.interrupt_disable_depth.get();
             debug_assert!(*depth > 0, "pop_off called without matching push_off");

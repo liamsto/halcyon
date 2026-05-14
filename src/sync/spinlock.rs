@@ -1,4 +1,4 @@
-use crate::cpu::current_cpu;
+use crate::cpu::InterruptGuard;
 use core::{
     cell::UnsafeCell,
     hint::spin_loop,
@@ -14,6 +14,9 @@ pub struct Spinlock<T: ?Sized> {
 
 pub struct SpinlockGuard<'a, T: ?Sized> {
     lock: &'a Spinlock<T>,
+    // Interrupts must be held in a disabled state for the lifetime of the lock guard
+    _irq_guard: InterruptGuard,
+    // Prevents sending the guard cross-thread
     _not_send: PhantomData<*mut ()>,
 }
 
@@ -26,11 +29,17 @@ impl<T> Spinlock<T> {
     }
 }
 
+impl<T: ?Sized> Drop for SpinlockGuard<'_, T> {
+    fn drop(&mut self) {
+        self.lock.unlock();
+        // Rust drops the fields of SpinlockGuard, then that drops
+        // `_irq_guard`, and in turn that Drop impl calls pop_off().
+    }
+}
+
 impl<T: ?Sized> Spinlock<T> {
     pub fn lock(&self) -> SpinlockGuard<'_, T> {
-        unsafe {
-            current_cpu().push_off();
-        }
+        let irq_guard = unsafe { crate::cpu::current_cpu().push_off_guard() };
 
         while self
             .locked
@@ -44,14 +53,13 @@ impl<T: ?Sized> Spinlock<T> {
 
         SpinlockGuard {
             lock: self,
+            _irq_guard: irq_guard,
             _not_send: PhantomData,
         }
     }
 
     pub fn try_lock(&self) -> Option<SpinlockGuard<'_, T>> {
-        unsafe {
-            crate::cpu::current_cpu().push_off();
-        }
+        let irq_guard = unsafe { crate::cpu::current_cpu().push_off_guard() };
 
         let acquired = self
             .locked
@@ -61,23 +69,17 @@ impl<T: ?Sized> Spinlock<T> {
         if acquired {
             Some(SpinlockGuard {
                 lock: self,
+                _irq_guard: irq_guard,
                 _not_send: PhantomData,
             })
         } else {
-            unsafe {
-                crate::cpu::current_cpu().pop_off();
-            }
-
+            // irq_guard drops here automatically, and interrupt state is restored
             None
         }
     }
 
     fn unlock(&self) {
         self.locked.store(false, Ordering::Release);
-
-        unsafe {
-            current_cpu().pop_off();
-        }
     }
 }
 
@@ -95,14 +97,5 @@ impl<T: ?Sized> DerefMut for SpinlockGuard<'_, T> {
     }
 }
 
-impl<T: ?Sized> Drop for SpinlockGuard<'_, T> {
-    fn drop(&mut self) {
-        self.lock.unlock();
-    }
-}
-
 // Lock gives sync shared access to T
 unsafe impl<T: ?Sized + Send> Sync for Spinlock<T> {}
-
-// Moving lock between owners is ok if T is Send
-unsafe impl<T: ?Sized + Send> Send for Spinlock<T> {}
