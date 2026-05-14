@@ -15,49 +15,56 @@ pub struct CpuSlot {
     local: CpuLocal,
 }
 
+// binds slot pointer into `tp`
+pub unsafe fn init_cpu(hart_id: usize) {
+    let slot = slot_for_hart(hart_id);
+    // ensure slot ownership is fully published before writing `tp`?
+    unsafe {
+        write_tp(slot as *const _ as usize);
+    }
+}
+
+fn slot_for_hart(hart_id: usize) -> &'static CpuLocal {
+    // Sentinel values can never be hart IDs
+    debug_assert_ne!(hart_id, HART_NONE);
+    debug_assert_ne!(hart_id, HART_INIT);
+
+    // maybe this hart already owns a slot
+    for cpu in CPUS.iter() {
+        if cpu.owner.load(Ordering::Acquire) == hart_id {
+            return &cpu.local;
+        }
+    }
+
+    // If not, claim an unowned slot
+    for cpu in CPUS.iter() {
+        match cpu
+            .owner
+            .compare_exchange(HART_NONE, HART_INIT, Ordering::AcqRel, Ordering::Acquire)
+        {
+            Ok(_) => {
+                // This is now the only hart that can initialize this slot
+                cpu.local.reset();
+                cpu.owner.store(hart_id, Ordering::Release);
+                return &cpu.local;
+            }
+
+            Err(_) => {
+                // Someone else claimed it
+                continue;
+            }
+        }
+    }
+
+    panic!("no CPU slot available for hart_id={hart_id}; MAX_CPUS={MAX_CPUS}");
+}
+
 impl CpuSlot {
     pub const fn new() -> Self {
         Self {
             owner: AtomicUsize::new(HART_NONE),
             local: CpuLocal::new(),
         }
-    }
-
-    fn slot_for_hart(hart_id: usize) -> &'static CpuLocal {
-        // Sentinel values can never be hart IDs
-        debug_assert_ne!(hart_id, HART_NONE);
-        debug_assert_ne!(hart_id, HART_INIT);
-
-        // maybe this hart already owns a slot
-        for cpu in CPUS.iter() {
-            if cpu.owner.load(Ordering::Acquire) == hart_id {
-                return &cpu.local;
-            }
-        }
-
-        // If not, claim an unowned slot
-        for cpu in CPUS.iter() {
-            match cpu.owner.compare_exchange(
-                HART_NONE,         // expected old value
-                HART_INIT,         // new temp value
-                Ordering::AcqRel,  // ordering if the exchange succeeds
-                Ordering::Acquire, // ordering if it fails
-            ) {
-                Ok(_) => {
-                    // This is now the only hart that can initialize this slot
-                    cpu.local.reset();
-                    cpu.owner.store(hart_id, Ordering::Release);
-                    return &cpu.local;
-                }
-
-                Err(_) => {
-                    // Someone else claimed it
-                    continue;
-                }
-            }
-        }
-
-        panic!("no CPU slot available for hart_id={hart_id}; MAX_CPUS={MAX_CPUS}");
     }
 }
 
@@ -97,7 +104,7 @@ pub unsafe fn read_tp() -> usize {
 }
 
 /// Sets the current thread pointer (`tp`) to a given value.
-pub unsafe fn set_tp(value: usize) {
+pub unsafe fn write_tp(value: usize) {
     unsafe {
         asm!(
             "mv tp, {val}",
