@@ -15,7 +15,8 @@ pub struct CpuSlot {
     local: CpuLocal,
 }
 
-/// Initializes a given hart's CPU-local pointer.
+/// Initializes a given hart's CPU-local pointer. Uses `Ordering::SeqCst`, which guarantees the publication of this hart
+/// occurs after other thread pointer reads and writes.
 ///
 /// ## Safety
 /// - `hart_id` must be a unique identifier for the current hardware hart.
@@ -23,10 +24,6 @@ pub struct CpuSlot {
 /// - Must not be called twice for the same hart.
 pub unsafe fn init_current_cpu(hart_id: usize) {
     let local = slot_for_hart(hart_id);
-    // We know that `slot_for_hart()` has either:
-    // - observed existing owner with Acquire
-    // - reset the slot and published for Release
-    // The fencing here is conservative, and forces the publication before any other tp-related traffic.
     fence(Ordering::SeqCst);
     unsafe {
         write_tp(local as *const CpuLocal as usize);
@@ -131,7 +128,7 @@ pub unsafe fn current_cpu() -> &'static CpuLocal {
     unsafe {
         let ptr = read_tp() as *const CpuLocal;
         debug_assert!(!ptr.is_null(), "thread pointer was null");
-        debug_assert_eq!((ptr as usize) & (core::mem::align_of::<CpuLocal>() - 1), 0);
+        debug_assert_eq!((ptr as usize) & (align_of::<CpuLocal>() - 1), 0);
         &*ptr
     }
 }
