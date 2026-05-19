@@ -11,7 +11,7 @@ mod sbi;
 mod sync;
 
 use crate::{
-    cpu::init_current_cpu,
+    cpu::{HART_NONE, init_current_cpu},
     sbi::{
         base::{
             get_impl_id, get_impl_ver, get_march_id, get_mimpid, get_spec_version, get_vendor_id,
@@ -19,7 +19,21 @@ use crate::{
         reset::{ResetReason, ResetType, system_reset},
     },
 };
-use core::{arch::global_asm, panic::PanicInfo, ptr::addr_of_mut};
+use core::{
+    arch::global_asm,
+    hint::spin_loop,
+    panic::PanicInfo,
+    ptr::addr_of_mut,
+    sync::atomic::{AtomicUsize, Ordering},
+};
+
+const BOOT_NOT_READY: usize = 0;
+const BOOT_READY: usize = 1;
+
+#[unsafe(link_section = ".data.boot")]
+static BOOT_HART: AtomicUsize = AtomicUsize::new(HART_NONE);
+#[unsafe(link_section = ".data.boot")]
+static BOOT_STATE: AtomicUsize = AtomicUsize::new(BOOT_NOT_READY);
 
 unsafe extern "C" {
     static mut __bss_start: u8;
@@ -30,15 +44,36 @@ global_asm!(include_str!("asm/boot.s"));
 
 #[unsafe(no_mangle)]
 pub extern "C" fn entry(hart_id: usize, opaque: usize) -> ! {
-    if is_boot_hart(hart_id) {
+    let boot = is_boot_hart(hart_id);
+
+    if boot {
         clear_bss();
+
+        unsafe { init_current_cpu(hart_id) };
+
+        /*
+         * TODO:
+         * global initialization here before we release any secondaries
+         * - parse DTB from `opaque`
+         * - initialize global alloc
+         * - initialize trap vector
+         * - initialize page tables
+         * - initialize interrupt controller/timer
+         * - discover harts
+         */
+
+        BOOT_STATE.store(BOOT_READY, Ordering::Release);
+
+        kmain(hart_id, opaque)
+    } else {
+        while BOOT_STATE.load(Ordering::Acquire) != BOOT_READY {
+            spin_loop();
+        }
+
+        unsafe { init_current_cpu(hart_id) };
+
+        secondary_main(hart_id, opaque)
     }
-    // TODO
-    // we might need to wait on the boot hart to finish, depending on how asm goes...
-    // if all harts get dropped into __start at the same time, will need to check an atomic
-    // to avoid entering kmain with the system in an uninitialized state
-    unsafe { init_current_cpu(hart_id) };
-    kmain(hart_id, opaque)
 }
 
 fn kmain(hart_id: usize, opaque: usize) -> ! {
@@ -63,7 +98,18 @@ fn kmain(hart_id: usize, opaque: usize) -> ! {
 
 // is this the boot hart? If not, we shouldn't clear BSS.
 fn is_boot_hart(hart_id: usize) -> bool {
-    todo!()
+    match BOOT_HART.compare_exchange(HART_NONE, hart_id, Ordering::AcqRel, Ordering::Acquire) {
+        Ok(_) => true,
+        Err(existing) => existing == hart_id,
+    }
+}
+
+fn secondary_main(_hart_id: usize, _opaque: usize) -> ! {
+    loop {
+        unsafe {
+            core::arch::asm!("wfi", options(nomem, nostack));
+        }
+    }
 }
 
 fn clear_bss() {
