@@ -11,8 +11,9 @@ use core::{
     sync::atomic::{AtomicUsize, Ordering},
 };
 use lib::{
+    arch::dtb,
     cpu::{HART_NONE, init_current_cpu},
-    dtb, println,
+    println,
     sbi::{
         base::{
             get_impl_id, get_impl_ver, get_march_id, get_mimpid, get_spec_version, get_vendor_id,
