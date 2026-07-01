@@ -1,5 +1,8 @@
-[package]
-name = "halcyon"
+[workspace]
+members = ["lib", "kernel"]
+resolver = "3"
+
+[workspace.package]
 version = "0.1.0"
 edition = "2024"
 
@@ -8,11 +11,3 @@ panic = "abort"
 
 [profile.release]
 panic = "abort"
-
-# Fixes "can't find crate for `test`" error appearing in main.rs
-[[bin]]
-name = "halcyon"
-path = "src/main.rs"
-test = false
-doctest = false
-bench = false

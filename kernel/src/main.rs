@@ -3,29 +3,22 @@
 
 extern crate alloc;
 
-mod arch;
-mod cpu;
-mod dtb;
-mod io;
-mod mem;
-mod sbi;
-mod sync;
-
-use crate::{
-    cpu::{HART_NONE, init_current_cpu},
-    sbi::{
-        base::{
-            get_impl_id, get_impl_ver, get_march_id, get_mimpid, get_spec_version, get_vendor_id,
-        },
-        reset::{ResetReason, ResetType, system_reset},
-    },
-};
 use core::{
     arch::global_asm,
     hint::spin_loop,
     panic::PanicInfo,
     ptr::addr_of_mut,
     sync::atomic::{AtomicUsize, Ordering},
+};
+use lib::{
+    cpu::{HART_NONE, init_current_cpu},
+    dtb, println,
+    sbi::{
+        base::{
+            get_impl_id, get_impl_ver, get_march_id, get_mimpid, get_spec_version, get_vendor_id,
+        },
+        reset::{ResetReason, ResetType, system_reset},
+    },
 };
 
 const BOOT_NOT_READY: usize = 0;
