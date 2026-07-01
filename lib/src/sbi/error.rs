@@ -25,19 +25,19 @@ pub enum SbiError {
 impl Display for SbiError {
     fn fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
         match self {
-            SbiError::Failed => write!(f, "operation failed due to I/O errors"),
-            SbiError::NotSupported => write!(f, "operation unsupported"),
-            SbiError::InvalidParam => write!(f, "operation failed due to an parameter"),
-            SbiError::Denied => write!(f, "the requested operation is forbidden"),
-            SbiError::InvalidAddress => {
+            Self::Failed => write!(f, "operation failed due to I/O errors"),
+            Self::NotSupported => write!(f, "operation unsupported"),
+            Self::InvalidParam => write!(f, "operation failed due to an parameter"),
+            Self::Denied => write!(f, "the requested operation is forbidden"),
+            Self::InvalidAddress => {
                 write!(f, "operation failed due to an invalid memory address")
             }
-            SbiError::AlreadyAvailable => write!(f, "the provided hartid is already started"),
-            SbiError::AlreadyStarted => write!(
+            Self::AlreadyAvailable => write!(f, "the provided hartid is already started"),
+            Self::AlreadyStarted => write!(
                 f,
                 "some of the counters specified in parameters are already started"
             ),
-            SbiError::AlreadyStopped => write!(
+            Self::AlreadyStopped => write!(
                 f,
                 "some of the counters specified in parameters are already stopped"
             ),
@@ -50,14 +50,14 @@ impl Error for SbiError {}
 impl From<isize> for SbiError {
     fn from(value: isize) -> Self {
         match value {
-            SBI_ERR_FAILED => SbiError::Failed,
-            SBI_ERR_NOT_SUPPORTED => SbiError::NotSupported,
-            SBI_ERR_INVALID_PARAM => SbiError::InvalidParam,
-            SBI_ERR_DENIED => SbiError::Denied,
-            SBI_ERR_INVALID_ADDRESS => SbiError::InvalidAddress,
-            SBI_ERR_ALREADY_AVAILABLE => SbiError::AlreadyAvailable,
-            SBI_ERR_ALREADY_STARTED => SbiError::AlreadyStarted,
-            SBI_ERR_ALREADY_STOPPED => SbiError::AlreadyStopped,
+            SBI_ERR_FAILED => Self::Failed,
+            SBI_ERR_NOT_SUPPORTED => Self::NotSupported,
+            SBI_ERR_INVALID_PARAM => Self::InvalidParam,
+            SBI_ERR_DENIED => Self::Denied,
+            SBI_ERR_INVALID_ADDRESS => Self::InvalidAddress,
+            SBI_ERR_ALREADY_AVAILABLE => Self::AlreadyAvailable,
+            SBI_ERR_ALREADY_STARTED => Self::AlreadyStarted,
+            SBI_ERR_ALREADY_STOPPED => Self::AlreadyStopped,
             _ => unreachable!(),
         }
     }

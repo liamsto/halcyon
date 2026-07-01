@@ -92,7 +92,7 @@ impl<'a> Info<'a> {
         Ok(())
     }
 
-    fn push_memreserve(&mut self, range: Range) -> Result<(), Error> {
+    const fn push_memreserve(&mut self, range: Range) -> Result<(), Error> {
         if self.memreserve_len == self.memreserve.len() {
             return Err(Error::TooManyMemreserve);
         }
@@ -235,7 +235,7 @@ unsafe fn read_header(base: *const u8) -> Result<Header, Error> {
     Ok(header)
 }
 
-unsafe fn read_be32(base: *const u8, off: usize) -> u32 {
+const unsafe fn read_be32(base: *const u8, off: usize) -> u32 {
     unsafe { u32::from_be(ptr::read_unaligned(base.add(off).cast::<u32>())) }
 }
 
@@ -439,10 +439,10 @@ fn kind_from_name(name: &str) -> Kind {
 }
 
 fn base_name(name: &str) -> &str {
-    match name.as_bytes().iter().position(|&byte| byte == b'@') {
-        Some(at) => &name[..at],
-        None => name,
-    }
+    name.as_bytes()
+        .iter()
+        .position(|&byte| byte == b'@')
+        .map_or(name, |at| &name[..at])
 }
 
 fn one_cell(value: &[u8]) -> Result<usize, Error> {

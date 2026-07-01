@@ -4,7 +4,7 @@ use core::{alloc::Layout, ptr::NonNull};
 const SIZE_CLASSES: &[usize] = &[
     8, 16, 32, 48, 64, 80, 96, 128, 160, 192, 256, 320, 384, 512, 768, 1024, 1536, 2048,
 ];
-
+const SIZE_CLASS_COUNT: usize = SIZE_CLASSES.len();
 const SMALL_MAX: usize = 2048;
 
 pub struct KernelHeap {
@@ -12,8 +12,6 @@ pub struct KernelHeap {
     bins: [Bin; SIZE_CLASS_COUNT],
     large: LargeAlloc,
 }
-
-const SIZE_CLASS_COUNT: usize = SIZE_CLASSES.len();
 
 impl KernelHeap {
     pub const fn empty() -> Self {
@@ -155,7 +153,7 @@ struct RunHeader {
     class_size: usize,
     total_count: u16,
     free_count: u16,
-    next: *mut RunHeader,
+    next: *mut Self,
     // TODO: bitmap or metadata
 }
 
@@ -199,12 +197,12 @@ impl LargeAlloc {
         let size = layout.size();
         let align = layout.align();
 
-        let pages = div_ceil(size, PAGE_SIZE_BYTES);
+        let pages = size.div_ceil(PAGE_SIZE_BYTES);
 
         let align_pages = if align <= PAGE_SIZE_BYTES {
             1
         } else {
-            div_ceil(align, PAGE_SIZE_BYTES).next_power_of_two()
+            align.div_ceil(PAGE_SIZE_BYTES).next_power_of_two()
         };
 
         unsafe { page_source.alloc_pages(pages, align_pages) }
@@ -216,13 +214,9 @@ impl LargeAlloc {
         ptr: NonNull<u8>,
         layout: Layout,
     ) {
-        let pages = div_ceil(layout.size(), PAGE_SIZE_BYTES);
+        let pages = layout.size().div_ceil(PAGE_SIZE_BYTES);
         unsafe {
             page_source.dealloc_pages(ptr, pages);
         }
     }
-}
-
-const fn div_ceil(x: usize, y: usize) -> usize {
-    (x + y - 1) / y
 }

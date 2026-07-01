@@ -74,6 +74,12 @@ impl CpuSlot {
     }
 }
 
+impl Default for CpuSlot {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 pub struct CpuLocal {
     interrupt_disable_depth: UnsafeCell<usize>,
     interrupts_were_enabled: UnsafeCell<bool>,
@@ -85,6 +91,7 @@ pub struct CpuLocal {
 unsafe impl Sync for CpuLocal {}
 
 /// Initializes a hart.
+#[allow(clippy::pointers_in_nomem_asm_block)] // we are passing a pointer, but we're only moving regs, not touching memory.
 pub fn init_cpu(ptr: *const CpuLocal) {
     unsafe {
         asm!(
@@ -203,5 +210,11 @@ impl CpuLocal {
                 enable_interrupts();
             }
         }
+    }
+}
+
+impl Default for CpuLocal {
+    fn default() -> Self {
+        Self::new()
     }
 }
