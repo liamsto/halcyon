@@ -4,6 +4,8 @@ const EXTN_SRST: usize = 0x5352_5354;
 const FID_SYSTEM_RESET: usize = 0;
 const PLATFORM_SPECIFIC_START: u32 = 0xF000_0000;
 const PLATFORM_SPECIFIC_END: u32 = 0xFFFF_FFFF;
+const RESERVED_START: u32 = 0x00000003;
+const RESERVED_END: u32 = 0xEFFFFFFF;
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 #[repr(transparent)]
@@ -13,9 +15,6 @@ impl ResetType {
     pub const SHUTDOWN: Self = Self(0x0000_0000);
     pub const COLD_REBOOT: Self = Self(0x0000_0001);
     pub const WARM_REBOOT: Self = Self(0x0000_0002);
-
-    const RESERVED_START: u32 = 0x00000003;
-    const RESERVED_END: u32 = 0xEFFFFFFF;
 
     pub const fn platform_specific(value: u32) -> Option<Self> {
         if value >= PLATFORM_SPECIFIC_START {
@@ -30,11 +29,11 @@ impl ResetType {
     }
 
     pub const fn is_platform_specific(self) -> bool {
-        self.0 >= PLATFORM_SPECIFIC_START
+        self.0 >= PLATFORM_SPECIFIC_START && self.0 <= PLATFORM_SPECIFIC_END
     }
 
     pub const fn is_reserved(self) -> bool {
-        self.0 >= Self::RESERVED_START && self.0 <= Self::RESERVED_END
+        self.0 >= RESERVED_START && self.0 <= RESERVED_END
     }
 }
 
