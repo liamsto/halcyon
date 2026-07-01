@@ -5,6 +5,7 @@ extern crate alloc;
 
 mod arch;
 mod cpu;
+mod dtb;
 mod io;
 mod mem;
 mod sbi;
@@ -54,17 +55,19 @@ pub extern "C" fn entry(hart_id: usize, opaque: usize) -> ! {
         /*
          * TODO:
          * global initialization here before we release any secondaries
-         * - parse DTB from `opaque`
          * - initialize global alloc
          * - initialize trap vector
          * - initialize page tables
          * - initialize interrupt controller/timer
          * - discover harts
          */
+        let boot_info = unsafe { dtb::parse(opaque) }.unwrap_or_else(|err| {
+            panic!("failed to parse DTB at {opaque:#x}: {err:?}");
+        });
 
         BOOT_STATE.store(BOOT_READY, Ordering::Release);
 
-        kmain(hart_id, opaque)
+        kmain(hart_id, &boot_info)
     } else {
         while BOOT_STATE.load(Ordering::Acquire) != BOOT_READY {
             spin_loop();
@@ -76,9 +79,39 @@ pub extern "C" fn entry(hart_id: usize, opaque: usize) -> ! {
     }
 }
 
-fn kmain(hart_id: usize, opaque: usize) -> ! {
+fn kmain(hart_id: usize, boot_info: &dtb::Info<'_>) -> ! {
     // do kernel stuff
     println!("\u{1B}[{}m[Halcyon - Boot Complete]\u{1B}[0m", 32);
+    println!("Boot hart: {}", hart_id);
+
+    if let Some(model) = boot_info.model {
+        println!("Device Tree Model: {}", model);
+    }
+
+    println!("DTB boot CPU ID: {}", boot_info.boot_cpuid);
+    println!("Detected harts: {}", boot_info.harts().len());
+    for hart in boot_info.harts() {
+        println!("  hart {}", hart);
+    }
+
+    println!("Memory ranges: {}", boot_info.mem().len());
+    for range in boot_info.mem() {
+        println!(
+            "  {:#x}..{:#x}",
+            range.base,
+            range.base.saturating_add(range.size)
+        );
+    }
+
+    println!("Memreserve ranges: {}", boot_info.memreserve().len());
+    for range in boot_info.memreserve() {
+        println!(
+            "  {:#x}..{:#x}",
+            range.base,
+            range.base.saturating_add(range.size)
+        );
+    }
+
     let spec_ver = get_spec_version();
     println!(
         "Specification Version: {}.{}\nVendor ID: {}\nSBI Implementation ID: {}\nSBI Implementation Version: {}\nMachine Architecture ID: {}\nMachine Implementation ID: {}\n",
