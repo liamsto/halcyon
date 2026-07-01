@@ -103,7 +103,6 @@ pub fn init_cpu(ptr: *const CpuLocal) {
 }
 
 /// Read the current thread pointer (`tp`).
-#[inline(always)]
 pub unsafe fn read_tp() -> usize {
     let value: usize;
     unsafe {
@@ -118,7 +117,6 @@ pub unsafe fn read_tp() -> usize {
 }
 
 /// Sets the current thread pointer (`tp`) to a given value.
-#[inline(always)]
 pub unsafe fn write_tp(value: usize) {
     unsafe {
         asm!(
@@ -130,7 +128,6 @@ pub unsafe fn write_tp(value: usize) {
 }
 
 // Returns a  `CpuLocal` for the current hart.
-#[inline(always)]
 pub unsafe fn current_cpu() -> &'static CpuLocal {
     unsafe {
         let ptr = read_tp() as *const CpuLocal;
