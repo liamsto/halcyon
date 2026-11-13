@@ -161,6 +161,5 @@ fn panic(info: &PanicInfo) -> ! {
             info.message()
         )
     }
-    let _ = system_reset(ResetType::SHUTDOWN, Some(ResetReason::SYSTEM_FAILURE));
-    unreachable!() // this pattern is annoying
+    system_reset(ResetType::SHUTDOWN, Some(ResetReason::SYSTEM_FAILURE)).unwrap() // TODO: .unwrap() is awkward here, but is there a better way?
 }
