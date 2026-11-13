@@ -5,7 +5,6 @@ const FID_CONSOLE_WRITE: usize = 0;
 const FID_CONSOLE_READ: usize = 1;
 const FID_CONSOLE_WRITE_BYTE: usize = 2;
 
-/// # Function: Console Write (FID #0)
 /// Write bytes to the debug console from input memory.
 ///
 /// See the [SBI Documentation](https://github.com/riscv-non-isa/riscv-sbi-doc/blob/master/src/ext-debug-console.adoc#function-console-write-fid-0) for more information.
@@ -25,8 +24,7 @@ pub fn write(msg: &str) -> Result<usize, SbiError> {
     }
 }
 
-/// # Function: Console Read (FID #1)
-/// Read bytes from the debug console into an output memory.
+/// Read bytes from the debug console into an output buffer.
 ///
 /// See the [SBI Documentation](https://github.com/riscv-non-isa/riscv-sbi-doc/blob/master/src/ext-debug-console.adoc#function-console-read-fid-1) for more information.
 /// ## Errors
@@ -54,7 +52,6 @@ pub fn read(buf: &mut [u8]) -> Result<usize, SbiError> {
     }
 }
 
-/// # Function: Console Write Byte (FID #2)
 /// Write a single byte to the debug console.
 ///
 /// See the [SBI Documentation](https://github.com/riscv-non-isa/riscv-sbi-doc/blob/master/src/ext-debug-console.adoc#function-console-write-byte-fid-2) for more information.

@@ -1,6 +1,5 @@
 use core::arch::asm;
 
-pub mod base;
 pub mod dbg_console;
 pub mod error;
 pub mod reset;

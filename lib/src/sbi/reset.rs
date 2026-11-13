@@ -3,7 +3,6 @@ use crate::sbi::{error::SbiError, sbi_call};
 const EXTN_SRST: usize = 0x5352_5354;
 const FID_SYSTEM_RESET: usize = 0;
 const PLATFORM_SPECIFIC_START: u32 = 0xF000_0000;
-// const PLATFORM_SPECIFIC_END: u32 = 0xFFFF_FFFF; // unused in comparison as of now since self.0 <= PLATFORM_SPECIFIC_END is always true
 const RESERVED_START: u32 = 0x00000003;
 const RESERVED_END: u32 = 0xEFFFFFFF;
 
