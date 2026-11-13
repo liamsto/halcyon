@@ -79,12 +79,7 @@ impl ResetReason {
     }
 }
 
-pub fn system_reset(
-    reset_type: ResetType,
-    reset_reason: Option<ResetReason>,
-) -> Result<!, SbiError> {
-    let reason = reset_reason.unwrap_or(ResetReason::NO_REASON);
-
+pub fn system_reset(reset_type: ResetType, reason: ResetReason) -> Result<!, SbiError> {
     let ret = sbi_call(
         EXTN_SRST,
         FID_SYSTEM_RESET,

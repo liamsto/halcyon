@@ -13,13 +13,8 @@ use core::{
 use lib::{
     arch::dtb,
     cpu::{HART_NONE, init_current_cpu},
-    println,
-    sbi::{
-        base::{
-            get_impl_id, get_impl_ver, get_march_id, get_mimpid, get_spec_version, get_vendor_id,
-        },
-        reset::{ResetReason, ResetType, system_reset},
-    },
+    println, sbi,
+    sbi::reset::{ResetReason, ResetType, system_reset},
 };
 
 const BOOT_NOT_READY: usize = 0;
@@ -106,20 +101,20 @@ fn kmain(hart_id: usize, boot_info: &dtb::Info<'_>) -> ! {
         );
     }
 
-    let spec_ver = get_spec_version();
+    let spec_ver = sbi::spec_version();
     println!(
         "Specification Version: {}.{}\nVendor ID: {}\nSBI Implementation ID: {}\nSBI Implementation Version: {}\nMachine Architecture ID: {}\nMachine Implementation ID: {}\n",
         spec_ver.0,
         spec_ver.1,
-        get_vendor_id(),
-        get_impl_id(),
-        get_impl_ver(),
-        get_march_id(),
-        get_mimpid()
+        sbi::vendor_id(),
+        sbi::impl_id(),
+        sbi::impl_ver(),
+        sbi::march_id(),
+        sbi::mimpid()
     );
 
     println!("Hello from RISC-V and the SBI!");
-    let _ = system_reset(ResetType::SHUTDOWN, Some(ResetReason::NO_REASON));
+    let _ = system_reset(ResetType::SHUTDOWN, ResetReason::NO_REASON);
     unreachable!()
 }
 
@@ -161,5 +156,5 @@ fn panic(info: &PanicInfo) -> ! {
             info.message()
         )
     }
-    system_reset(ResetType::SHUTDOWN, Some(ResetReason::SYSTEM_FAILURE)).unwrap() // TODO: .unwrap() is awkward here, but is there a better way?
+    system_reset(ResetType::SHUTDOWN, ResetReason::SYSTEM_FAILURE).unwrap() // TODO: .unwrap() is awkward here, but is there a better way?
 }
