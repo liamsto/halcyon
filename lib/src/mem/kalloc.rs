@@ -1,5 +1,5 @@
 use crate::mem::{PageSource, heap::KernelHeap};
-use crate::sync::spinlock::Spinlock;
+use crate::sync::Spinlock;
 use core::{
     alloc::{GlobalAlloc, Layout},
     ptr::{self, NonNull},

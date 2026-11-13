@@ -84,10 +84,10 @@ impl Bin {
             }
 
             let run = &mut *self.partial;
-            let ptr = run.alloc_block()?;
+            let ptr = run.alloc()?;
 
             if run.free_count == 0 {
-                self.move_partial_to_full();
+                self.move_to_full();
             }
             Some(ptr)
         }
@@ -98,11 +98,11 @@ impl Bin {
         //
         // page_meta[virt_to_page(ptr)].run_head
         unsafe {
-            let run = find_run_for_ptr(ptr);
-            (*run).free_block(ptr);
+            let run = run(ptr);
+            (*run).free(ptr);
 
             if (*run).free_count == (*run).total_count {
-                self.release_empty_run(run);
+                self.release_empty(run);
             }
         }
     }
@@ -120,11 +120,11 @@ impl Bin {
         Some(())
     }
 
-    unsafe fn move_partial_to_full(&mut self) {
+    unsafe fn move_to_full(&mut self) {
         // list manipulation
     }
 
-    unsafe fn release_empty_run(&mut self, run: *mut RunHeader) {
+    unsafe fn release_empty(&mut self, run: *mut RunHeader) {
         // remove from bin list and return pages to PageSource
     }
 
@@ -166,19 +166,18 @@ impl RunHeader {
         // initialize bitmap and counters
     }
 
-    unsafe fn alloc_block(&mut self) -> Option<NonNull<u8>> {
+    unsafe fn alloc(&mut self) -> Option<NonNull<u8>> {
         // find first zero bit, set, return block pointer
         todo!()
     }
 
-    unsafe fn free_block(&mut self, ptr: NonNull<u8>) {
+    unsafe fn free(&mut self, ptr: NonNull<u8>) {
         // compute block index, clear bit
         todo!()
     }
 }
 
-unsafe fn find_run_for_ptr(_ptr: NonNull<u8>) -> *mut RunHeader {
-    // Use per-page metadata, not heap allocation.
+unsafe fn run(ptr: NonNull<u8>) -> *mut RunHeader {
     todo!()
 }
 
