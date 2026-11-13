@@ -1,12 +1,12 @@
 use crate::io::puts;
-use crate::sbi::dbg_console;
+use crate::sbi::console;
 use core::fmt::Write;
 
 struct Console;
 
 impl Write for Console {
     fn write_str(&mut self, s: &str) -> core::fmt::Result {
-        match dbg_console::write(s) {
+        match console::write(s) {
             Ok(_) => Ok(()),
             Err(_) => {
                 puts("an error occured");
@@ -16,7 +16,7 @@ impl Write for Console {
     }
 
     fn write_char(&mut self, c: char) -> core::fmt::Result {
-        match dbg_console::write_byte(c as u8) {
+        match console::write_byte(c as u8) {
             Ok(_) => Ok(()),
             Err(_) => {
                 puts("an error occured");
