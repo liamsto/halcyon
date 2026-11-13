@@ -8,6 +8,10 @@ const FID_CONSOLE_WRITE_BYTE: usize = 2;
 /// Write bytes to the debug console from input memory.
 ///
 /// See the [SBI Documentation](https://github.com/riscv-non-isa/riscv-sbi-doc/blob/master/src/ext-debug-console.adoc#function-console-write-fid-0) for more information.
+///
+/// ## Returns
+/// Returns the value returned from the SBI call as a `usize` if successful.
+///
 /// ## Errors
 /// - Returns `SbiError::InvalidParam` if the `num_bytes`, `base_addr_lo`, and `base_addr_hi` parameters from the call to `sbi_call` are invalid.
 /// - Returns `SbiError::Denied` if writing to the debug console is not allowed.
@@ -27,6 +31,10 @@ pub fn write(msg: &str) -> Result<usize, SbiError> {
 /// Read bytes from the debug console into an output buffer.
 ///
 /// See the [SBI Documentation](https://github.com/riscv-non-isa/riscv-sbi-doc/blob/master/src/ext-debug-console.adoc#function-console-read-fid-1) for more information.
+///
+/// ## Returns
+/// Returns the value returned from the SBI call as a `usize` if successful.
+///
 /// ## Errors
 /// - Returns `SbiError::InvalidParam` if the `num_bytes`, `base_addr_lo`, and `base_addr_hi` parameters from the call to `sbi_call` are invalid.
 /// - Returns `SbiError::Denied` if writing to the debug console is not allowed.
@@ -55,6 +63,10 @@ pub fn read(buf: &mut [u8]) -> Result<usize, SbiError> {
 /// Write a single byte to the debug console.
 ///
 /// See the [SBI Documentation](https://github.com/riscv-non-isa/riscv-sbi-doc/blob/master/src/ext-debug-console.adoc#function-console-write-byte-fid-2) for more information.
+///
+/// ## Returns
+/// Returns the value returned from the SBI call as a `usize` if successful.
+///
 /// ## Errors
 /// - Returns `SbiError::Denied` if writing to the debug console is not allowed.
 /// - Returns `SbiError::Failed` if the write fails because of I/O errors.
