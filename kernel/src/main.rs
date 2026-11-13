@@ -114,8 +114,7 @@ fn kmain(hart_id: usize, boot_info: &dtb::Info<'_>) -> ! {
     );
 
     println!("Hello from RISC-V and the SBI!");
-    let _ = system_reset(ResetType::SHUTDOWN, ResetReason::NO_REASON);
-    unreachable!()
+    system_reset(ResetType::SHUTDOWN, ResetReason::NO_REASON).unwrap()
 }
 
 // is this the boot hart? If not, we shouldn't clear BSS.
