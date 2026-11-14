@@ -13,8 +13,12 @@ use core::{
 use lib::{
     arch::dtb,
     cpu::{HART_NONE, init_current_cpu},
-    println, sbi,
-    sbi::reset::{ResetReason, ResetType, system_reset},
+    mem::KERNEL_ALLOC,
+    println,
+    sbi::{
+        self,
+        reset::{ResetReason, ResetType, system_reset},
+    },
 };
 
 const BOOT_NOT_READY: usize = 0;
@@ -50,6 +54,10 @@ pub extern "C" fn entry(hart_id: usize, opaque: usize) -> ! {
          * - initialize interrupt controller/timer
          * - discover harts
          */
+
+        // TODO: once we initialize virtual memory and get a page source, we can uncomment this
+        // KERNEL_ALLOC.init(page_source);
+
         let boot_info = unsafe { dtb::parse(opaque) }.unwrap_or_else(|err| {
             panic!("failed to parse DTB at {opaque:#x}: {err:?}");
         });
