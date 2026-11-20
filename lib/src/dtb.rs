@@ -1,3 +1,5 @@
+//! Flattened device tree parsing.
+
 use crate::cpu::MAX_CPUS;
 use core::{ptr, slice, str};
 
@@ -363,7 +365,7 @@ impl<'a> Parser<'a> {
                 Some("cpu") => node.kind = Kind::Cpu,
                 _ => {}
             },
-            "model" if is_root => set_model(value, &mut self.info)?,
+            "model" if is_root => self.info.model = first_str(value)?,
             "reg" => node.reg = Some(value),
             "status" => node.status = first_str(value)?,
             _ => {}
@@ -419,11 +421,6 @@ impl<'a> Parser<'a> {
         self.pos += 4;
         Ok(value)
     }
-}
-
-fn set_model<'a>(value: &'a [u8], info: &mut Info<'a>) -> Result<(), Error> {
-    info.model = first_str(value)?;
-    Ok(())
 }
 
 fn enabled(status: Option<&str>) -> bool {

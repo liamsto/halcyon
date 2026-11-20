@@ -1,8 +1,8 @@
 #![no_std]
 
-pub mod arch;
+pub mod console;
 pub mod cpu;
-pub mod io;
+pub mod dtb;
 pub mod mem;
 pub mod sbi;
 pub mod sync;

@@ -1,4 +1,4 @@
-use crate::mem::{PAGE_SIZE_BYTES, PageSource};
+use super::{PAGE_SIZE, PageSource};
 use core::{alloc::Layout, mem::size_of, ptr::NonNull};
 
 const SIZE_CLASSES: &[usize] = &[
@@ -7,19 +7,19 @@ const SIZE_CLASSES: &[usize] = &[
 const SIZE_CLASS_COUNT: usize = SIZE_CLASSES.len();
 const SMALL_MAX: usize = 2048;
 const BITS_PER_WORD: usize = usize::BITS as usize;
-const BITMAP_WORDS: usize = (PAGE_SIZE_BYTES / 8).div_ceil(BITS_PER_WORD);
+const BITMAP_WORDS: usize = (PAGE_SIZE / 8).div_ceil(BITS_PER_WORD);
 
 // Require page-aligned, one-page small runs
-const _: () = assert!(PAGE_SIZE_BYTES.is_power_of_two() && PAGE_SIZE_BYTES >= 4096);
+const _: () = assert!(PAGE_SIZE.is_power_of_two() && PAGE_SIZE >= 4096);
 
-pub struct KernelHeap {
+pub(super) struct KernelHeap {
     page_source: Option<&'static dyn PageSource>,
     bins: [Bin; SIZE_CLASS_COUNT],
     large: LargeAlloc,
 }
 
 impl KernelHeap {
-    pub const fn empty() -> Self {
+    pub(super) const fn empty() -> Self {
         Self {
             page_source: None,
             bins: [Bin::empty(); SIZE_CLASS_COUNT],
@@ -28,14 +28,14 @@ impl KernelHeap {
     }
 
     // Call once, before any allocation or deallocation.
-    pub fn init(&mut self, page_source: &'static dyn PageSource) {
+    pub(super) fn init(&mut self, page_source: &'static dyn PageSource) {
         assert!(self.page_source.is_none(), "heap already initialized");
         self.page_source = Some(page_source);
     }
 
     /// # Safety
     /// Caller must uphold exclusive-access and layout.
-    pub unsafe fn alloc(&mut self, layout: Layout) -> Option<NonNull<u8>> {
+    pub(super) unsafe fn alloc(&mut self, layout: Layout) -> Option<NonNull<u8>> {
         if layout.size() == 0 {
             return None;
         }
@@ -49,7 +49,7 @@ impl KernelHeap {
     /// # Safety
     /// `ptr` must be live, owned by this heap, and allocated with `layout`.
     /// Don't double free.
-    pub unsafe fn dealloc(&mut self, ptr: NonNull<u8>, layout: Layout) {
+    pub(super) unsafe fn dealloc(&mut self, ptr: NonNull<u8>, layout: Layout) {
         if layout.size() == 0 {
             return;
         }
@@ -61,7 +61,7 @@ impl KernelHeap {
     }
 }
 
-// *All* access to the heap has to be externally synchronized,
+// SAFETY: *All* access to the heap has to be externally synchronized,
 // and PageSource needs to be under that synchronization.
 unsafe impl Send for KernelHeap {}
 
@@ -144,7 +144,7 @@ impl Bin {
         let header = RunHeader::new(class_size)?;
         unsafe {
             let page = page_source.alloc_pages(1, 1)?;
-            debug_assert_eq!((page.as_ptr() as usize) % PAGE_SIZE_BYTES, 0);
+            debug_assert_eq!((page.as_ptr() as usize) % PAGE_SIZE, 0);
             let run = page.as_ptr().cast::<RunHeader>();
             core::ptr::write(run, header);
             Self::push(&mut self.partial, run);
@@ -200,10 +200,10 @@ impl RunHeader {
         }
         let block_align = 1usize << class_size.trailing_zeros();
         let data_offset = size_of::<Self>().checked_add(block_align - 1)? & !(block_align - 1);
-        if data_offset >= PAGE_SIZE_BYTES {
+        if data_offset >= PAGE_SIZE {
             return None;
         }
-        let total_count = (PAGE_SIZE_BYTES - data_offset) / class_size;
+        let total_count = (PAGE_SIZE - data_offset) / class_size;
         if total_count == 0 || total_count > BITMAP_WORDS * BITS_PER_WORD {
             return None;
         }
@@ -272,7 +272,7 @@ impl RunHeader {
 }
 
 fn run_for(ptr: NonNull<u8>) -> *mut RunHeader {
-    let offset = (ptr.as_ptr() as usize) & (PAGE_SIZE_BYTES - 1);
+    let offset = (ptr.as_ptr() as usize) & (PAGE_SIZE - 1);
     ptr.as_ptr().wrapping_sub(offset).cast::<RunHeader>()
 }
 
@@ -288,9 +288,9 @@ impl LargeAlloc {
         page_source: &'static dyn PageSource,
         layout: Layout,
     ) -> Option<NonNull<u8>> {
-        let pages = layout.size().div_ceil(PAGE_SIZE_BYTES);
-        let align_pages = if layout.align() > PAGE_SIZE_BYTES {
-            layout.align() / PAGE_SIZE_BYTES
+        let pages = layout.size().div_ceil(PAGE_SIZE);
+        let align_pages = if layout.align() > PAGE_SIZE {
+            layout.align() / PAGE_SIZE
         } else {
             1
         };
@@ -303,7 +303,7 @@ impl LargeAlloc {
         ptr: NonNull<u8>,
         layout: Layout,
     ) {
-        let pages = layout.size().div_ceil(PAGE_SIZE_BYTES);
+        let pages = layout.size().div_ceil(PAGE_SIZE);
         unsafe { page_source.dealloc_pages(ptr, pages) };
     }
 }

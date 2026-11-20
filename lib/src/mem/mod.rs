@@ -1,83 +1,70 @@
+//! Memory management.
+
 mod heap;
-use crate::mem::heap::KernelHeap;
+
 use crate::sync::Spinlock;
 use core::{
     alloc::{GlobalAlloc, Layout},
     ptr::{self, NonNull},
     sync::atomic::{AtomicBool, Ordering},
 };
+use heap::KernelHeap;
 
-pub const PAGE_SIZE_BYTES: usize = 4096;
-
-#[derive(Copy, Clone, Debug, PartialEq, Eq, PartialOrd, Ord)]
-#[repr(transparent)]
-pub struct PhysAddr(pub usize);
-
-#[derive(Copy, Clone, Debug, PartialEq, Eq, PartialOrd, Ord)]
-#[repr(transparent)]
-pub struct VirtAddr(pub usize);
+/// Size of a page in bytes.
+pub const PAGE_SIZE: usize = 4096;
 
 /// Provides mapped kernel virtual memory to the heap.
 ///
-/// The following invariants need to be held by all implementations:
-/// - Return `page_count` contiguous, writable virtual pages.
-/// - Align returned virtaddr to `align_pages * PAGE_SIZE_BYTES`.
+/// # Safety
+/// Implementations must:
+/// - Return `count` contiguous, writable virtual pages.
+/// - Align returned addresses to `align * PAGE_SIZE`.
 /// - Keep all pages mapped until `dealloc_pages`.
 /// - Support concurrent calls if used elsewhere.
-/// - Don't recursively allocate through the heap.
+/// - Not recursively allocate through the heap.
 ///
-/// The actual physical frames don't need to be contiguous.
-pub trait PageSource: Sync {
-    /// # Safety
+/// The physical frames do not need to be contiguous.
+pub unsafe trait PageSource: Sync {
+    /// Allocates `count` pages aligned to `align` pages.
     ///
-    /// `pages` must be nonzero.
-    /// `align_pages` must be a nonzero and a power of two.
+    /// # Safety
+    /// `count` must be nonzero. `align` must be a nonzero power of two.
     ///
     /// The caller must eventually return the allocation with the same base and page count.
-    unsafe fn alloc_pages(&self, page_count: usize, alignment: usize) -> Option<NonNull<u8>>;
+    unsafe fn alloc_pages(&self, count: usize, align: usize) -> Option<NonNull<u8>>;
 
+    /// Frees `count` pages starting at `base`.
+    ///
     /// # Safety
+    /// `base` must be a live allocation from `alloc_pages`, with `count` being the original count.
     ///
-    /// `base` needs to be a live allocation given by `alloc_pages`, with `pages` being the original count.
-    ///
-    /// No references using this allocation may remain in use.
-    unsafe fn dealloc_pages(&self, base: NonNull<u8>, pages: usize);
+    /// No references into this allocation may remain in use.
+    unsafe fn dealloc_pages(&self, base: NonNull<u8>, count: usize);
 }
 
 #[global_allocator]
-pub static KERNEL_ALLOC: KernelAllocator = KernelAllocator::new();
+static KERNEL_ALLOC: KernelAllocator = KernelAllocator {
+    initialized: AtomicBool::new(false),
+    heap: Spinlock::new(KernelHeap::empty()),
+};
 
-pub struct KernelAllocator {
+/// Gives the kernel heap its page source. Allocations fail until this is called.
+///
+/// # Panics
+/// Panics if called more than once.
+pub fn init_heap(page_source: &'static dyn PageSource) {
+    KERNEL_ALLOC.heap.lock().init(page_source);
+    KERNEL_ALLOC.initialized.store(true, Ordering::Release);
+}
+
+struct KernelAllocator {
+    // Lets allocations before `init_heap` fail without touching the lock, which needs per-hart
+    // state.
     initialized: AtomicBool,
     heap: Spinlock<KernelHeap>,
 }
 
-impl KernelAllocator {
-    pub const fn new() -> Self {
-        Self {
-            initialized: AtomicBool::new(false),
-            heap: Spinlock::new(KernelHeap::empty()),
-        }
-    }
-
-    /// # Safety
-    ///
-    /// Called only once, after PageSource is fully initialized and before other harts can allocate.
-    ///
-    /// PageSource must remain valid for the kernel's lifetime.
-    pub unsafe fn init(&self, page_source: &'static dyn PageSource) {
-        let mut heap = self.heap.lock();
-
-        heap.init(page_source);
-
-        self.initialized.store(true, Ordering::Release);
-    }
-
-    pub fn is_initialized(&self) -> bool {
-        self.initialized.load(Ordering::Acquire)
-    }
-}
-
+// SAFETY: Allocation and deallocation go through the heap lock.
 unsafe impl GlobalAlloc for KernelAllocator {
     unsafe fn alloc(&self, layout: Layout) -> *mut u8 {
         if layout.size() == 0 {
@@ -90,25 +77,22 @@ unsafe impl GlobalAlloc for KernelAllocator {
 
         let mut heap = self.heap.lock();
 
+        // SAFETY: The lock gives exclusive access to the heap.
         unsafe { heap.alloc(layout).map_or(ptr::null_mut(), |p| p.as_ptr()) }
     }
 
     unsafe fn dealloc(&self, ptr: *mut u8, layout: Layout) {
-        if ptr.is_null() || layout.size() == 0 {
+        let Some(ptr) = NonNull::new(ptr) else {
+            return;
+        };
+        if layout.size() == 0 {
             return;
         }
 
         // Valid allocations must originate from an initialized heap.
         let mut heap = self.heap.lock();
 
-        unsafe {
-            heap.dealloc(NonNull::new_unchecked(ptr), layout);
-        }
-    }
-}
-
-impl Default for KernelAllocator {
-    fn default() -> Self {
-        Self::new()
+        // SAFETY: The caller guarantees `ptr` was allocated with `layout` by this allocator.
+        unsafe { heap.dealloc(ptr, layout) };
     }
 }

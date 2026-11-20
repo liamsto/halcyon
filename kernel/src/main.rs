@@ -11,21 +11,17 @@ use core::{
     sync::atomic::{AtomicUsize, Ordering},
 };
 use lib::{
-    arch::dtb,
-    cpu::{HART_NONE, init_current_cpu},
-    mem::KERNEL_ALLOC,
-    println,
-    sbi::{
-        self,
-        reset::{ResetReason, ResetType, system_reset},
-    },
+    cpu::{self, init_current_cpu},
+    dtb, println,
+    sbi::{self, ResetReason, ResetType},
 };
 
+const NO_HART: usize = usize::MAX;
 const BOOT_NOT_READY: usize = 0;
 const BOOT_READY: usize = 1;
 
 #[unsafe(link_section = ".data.boot")]
-static BOOT_HART: AtomicUsize = AtomicUsize::new(HART_NONE);
+static BOOT_HART: AtomicUsize = AtomicUsize::new(NO_HART);
 #[unsafe(link_section = ".data.boot")]
 static BOOT_STATE: AtomicUsize = AtomicUsize::new(BOOT_NOT_READY);
 
@@ -56,7 +52,7 @@ pub extern "C" fn entry(hart_id: usize, opaque: usize) -> ! {
          */
 
         // TODO: once we initialize virtual memory and get a page source, we can uncomment this
-        // KERNEL_ALLOC.init(page_source);
+        // mem::init_heap(page_source);
 
         let boot_info = unsafe { dtb::parse(opaque) }.unwrap_or_else(|err| {
             panic!("failed to parse DTB at {opaque:#x}: {err:?}");
@@ -109,36 +105,31 @@ fn kmain(hart_id: usize, boot_info: &dtb::Info<'_>) -> ! {
         );
     }
 
-    let spec_ver = sbi::spec_version();
     println!(
-        "Specification Version: {}.{}\nVendor ID: {}\nSBI Implementation ID: {}\nSBI Implementation Version: {}\nMachine Architecture ID: {}\nMachine Implementation ID: {}\n",
-        spec_ver.0,
-        spec_ver.1,
-        sbi::vendor_id(),
+        "Specification Version: {}\nVendor ID: {}\nSBI Implementation ID: {}\nSBI Implementation Version: {}\nMachine Architecture ID: {}\nMachine Implementation ID: {}\n",
+        sbi::spec_version(),
+        sbi::mvendorid(),
         sbi::impl_id(),
-        sbi::impl_ver(),
-        sbi::march_id(),
+        sbi::impl_version(),
+        sbi::marchid(),
         sbi::mimpid()
     );
 
     println!("Hello from RISC-V and the SBI!");
-    system_reset(ResetType::SHUTDOWN, ResetReason::NO_REASON).unwrap()
+    let err = sbi::system_reset(ResetType::SHUTDOWN, ResetReason::NO_REASON);
+    panic!("shutdown failed: {err}");
 }
 
 // is this the boot hart? If not, we shouldn't clear BSS.
 fn is_boot_hart(hart_id: usize) -> bool {
-    match BOOT_HART.compare_exchange(HART_NONE, hart_id, Ordering::AcqRel, Ordering::Acquire) {
+    match BOOT_HART.compare_exchange(NO_HART, hart_id, Ordering::AcqRel, Ordering::Acquire) {
         Ok(_) => true,
         Err(existing) => existing == hart_id,
     }
 }
 
 fn secondary_main(_hart_id: usize, _opaque: usize) -> ! {
-    loop {
-        unsafe {
-            core::arch::asm!("wfi", options(nomem, nostack));
-        }
-    }
+    cpu::halt()
 }
 
 fn clear_bss() {
@@ -163,5 +154,7 @@ fn panic(info: &PanicInfo) -> ! {
             info.message()
         )
     }
-    system_reset(ResetType::SHUTDOWN, ResetReason::SYSTEM_FAILURE).unwrap() // TODO: .unwrap() is awkward here, but is there a better way?
+    let err = sbi::system_reset(ResetType::SHUTDOWN, ResetReason::SYSTEM_FAILURE);
+    println!("shutdown failed: {err}");
+    cpu::halt()
 }

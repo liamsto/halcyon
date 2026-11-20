@@ -27,6 +27,11 @@ _start:
     .option pop
 
     /*
+     * tp holds the per-hart state pointer. Zero it so use before init_current_cpu is caught.
+     */
+    mv tp, zero
+
+    /*
      * HSM-started harts should already have SIE cleared, but this makes sure it happens anw
      */
     csrw sie, zero
