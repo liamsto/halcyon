@@ -14,6 +14,7 @@ use lib::{
     cpu::{self, init_current_cpu},
     dtb, println,
     sbi::{self, ResetReason, ResetType},
+    trap,
 };
 
 const NO_HART: usize = usize::MAX;
@@ -34,6 +35,10 @@ global_asm!(include_str!("asm/boot.s"));
 
 #[unsafe(no_mangle)]
 pub extern "C" fn entry(hart_id: usize, opaque: usize) -> ! {
+    // stvec is per-hart, so secondaries need this too. It comes first so a fault anywhere later
+    // in boot gets reported.
+    trap::init();
+
     let boot = is_boot_hart(hart_id);
 
     if boot {
@@ -43,15 +48,14 @@ pub extern "C" fn entry(hart_id: usize, opaque: usize) -> ! {
 
         /*
          * TODO:
-         * global initialization here before we release any secondaries
+         * global initialization here before we release any secondaries (these aren't really in any particular order)
          * - initialize global alloc
-         * - initialize trap vector
          * - initialize page tables
          * - initialize interrupt controller/timer
          * - discover harts
          */
 
-        // TODO: once we initialize virtual memory and get a page source, we can uncomment this
+        // TODO: once we initialize virtual memory and get a page source, we can uncomment this and do heap stuff
         // mem::init_heap(page_source);
 
         let boot_info = unsafe { dtb::parse(opaque) }.unwrap_or_else(|err| {
