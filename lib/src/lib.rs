@@ -6,3 +6,4 @@ pub mod dtb;
 pub mod mem;
 pub mod sbi;
 pub mod sync;
+pub mod trap;
