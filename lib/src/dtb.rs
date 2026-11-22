@@ -48,6 +48,8 @@ impl Range {
 }
 
 pub struct Info<'a> {
+    /// The whole device tree blob.
+    pub blob: &'a [u8],
     pub model: Option<&'a str>,
     pub boot_cpuid: u32,
     mem: [Range; MAX_RANGES],
@@ -59,8 +61,9 @@ pub struct Info<'a> {
 }
 
 impl<'a> Info<'a> {
-    const fn empty(boot_cpuid: u32) -> Self {
+    const fn empty(blob: &'a [u8], boot_cpuid: u32) -> Self {
         Self {
+            blob,
             model: None,
             boot_cpuid,
             mem: [Range::EMPTY; MAX_RANGES],
@@ -76,6 +79,8 @@ impl<'a> Info<'a> {
         &self.mem[..self.mem_len]
     }
 
+    /// Memory the kernel must leave alone: the memory reservation block and the children of
+    /// `/reserved-memory` that have a fixed address.
     pub fn memreserve(&self) -> &[Range] {
         &self.memreserve[..self.memreserve_len]
     }
@@ -133,6 +138,7 @@ struct Header {
 enum Kind {
     Other,
     Memory,
+    Reserved,
     Cpu,
 }
 
@@ -183,7 +189,7 @@ pub unsafe fn parse<'a>(addr: usize) -> Result<Info<'a>, Error> {
     let base = addr as *const u8;
     let header = unsafe { read_header(base)? };
     let blob = unsafe { slice::from_raw_parts(base, header.total) };
-    let mut info = Info::empty(header.boot_cpuid);
+    let mut info = Info::empty(blob, header.boot_cpuid);
 
     parse_reserve(blob, header.reserve_off, &mut info)?;
 
@@ -311,7 +317,11 @@ impl<'a> Parser<'a> {
             parent_size,
             addr_cells: DEFAULT_ADDR_CELLS,
             size_cells: DEFAULT_SIZE_CELLS,
-            kind: kind_from_name(name),
+            kind: match self.depth {
+                // Firmware describes the memory it keeps for itself here.
+                2 if self.stack[1].name == "reserved-memory" => Kind::Reserved,
+                _ => kind_from_name(name),
+            },
             reg: None,
             status: None,
         };
@@ -331,7 +341,8 @@ impl<'a> Parser<'a> {
         }
 
         match node.kind {
-            Kind::Memory => self.parse_mem(node),
+            Kind::Memory => self.parse_mem(node, Info::push_mem),
+            Kind::Reserved => self.parse_mem(node, Info::push_memreserve),
             Kind::Cpu => self.parse_cpu(node),
             Kind::Other => Ok(()),
         }
@@ -374,7 +385,11 @@ impl<'a> Parser<'a> {
         Ok(())
     }
 
-    fn parse_mem(&mut self, node: Node<'a>) -> Result<(), Error> {
+    fn parse_mem(
+        &mut self,
+        node: Node<'a>,
+        push: fn(&mut Info<'a>, Range) -> Result<(), Error>,
+    ) -> Result<(), Error> {
         let Some(reg) = node.reg else {
             return Ok(());
         };
@@ -388,7 +403,7 @@ impl<'a> Parser<'a> {
             let base = read_cells(reg, &mut off, node.parent_addr)?;
             let size = read_cells(reg, &mut off, node.parent_size)?;
             if size != 0 {
-                self.info.push_mem(Range { base, size })?;
+                push(&mut self.info, Range { base, size })?;
             }
         }
 
