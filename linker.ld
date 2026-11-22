@@ -9,18 +9,25 @@ STACK_SIZE = 0x4000; /* 16 KiB */
 SECTIONS
 {
   . = BASE_ADDRESS;
+  __kernel_start = .;
 
   .text : {
     KEEP(*(.text.entry))
     *(.text .text.*)
   }
 
+  /* Page align whatever gets different page permissions. */
+  . = ALIGN(4096);
+  __text_end = .;
+
   .rodata : {
     *(.srodata .srodata.*)
     *(.rodata .rodata.*)
   }
 
-  . = ALIGN(8);
+  . = ALIGN(4096);
+  __rodata_end = .;
+
   .data : {
     PROVIDE(__global_pointer$ = . + 0x800);
 
@@ -47,4 +54,7 @@ SECTIONS
   }
 
   __stack_top = __boot_stacks_end;
+
+  . = ALIGN(4096);
+  __kernel_end = .;
 }
